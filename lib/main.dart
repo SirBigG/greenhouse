@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:charts_flutter/flutter.dart' as charts;
 
 void main() {
   runApp(MyApp());
@@ -22,7 +27,7 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: MyHomePage(title: 'Greenhouse charts'),
     );
   }
 }
@@ -46,68 +51,136 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  List temperatureData;
+  List humidityData;
 
-  void _incrementCounter() {
+  getTemperature() async {
+    var response = await http.get(
+      'http://localhost:8088/temperature',
+      headers: {'Accept': 'application/json'},
+    );
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      temperatureData = json.decode(response.body)["results"][0]["series"][0]["values"];
+    });
+  }
+
+  getHumidity() async {
+    var response = await http.get(
+      'http://localhost:8088/humidity',
+      headers: {'Accept': 'application/json'},
+    );
+    setState(() {
+      humidityData = json.decode(response.body)["results"][0]["series"][0]["values"];
     });
   }
 
   @override
+  void initState() {
+    super.initState();
+    this.getTemperature().then((d) => {print("temperature request sent")});
+    this.getHumidity().then((d) => {print("humidity request sent")});
+  }
+
+
+  @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+    return new Scaffold(
+      appBar: new AppBar(
+        title: new Text('Tool Data'),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      body: Container(
+          margin: const EdgeInsets.all(30.0),
+      child: Center(
+
+          child: SingleChildScrollView(
+          child: Column(
+              children: [
+                  Row(children: [Text("Temperature (C)")]),
+                  // temperatureData == null ? CircularProgressIndicator() : createTemperatureChart()
+              Row(children: [SizedBox(
+                  width: 700.0,
+                  height: 300.0,
+                  child: createTemperatureChart()
+              )]),
+                Row(children: [Text("Humidity (%)")]),
+                Row(children: [SizedBox(
+                    width: 700.0,
+                    height: 300.0,
+                    child: createHumidityChart()
+                )]),
+                ]
+
+          )
+      )
+    ))
     );
   }
+
+  Widget createTemperatureChart() {
+    List<TimeSeries> data = [];
+    for (int i = 0; i < temperatureData.length; i++) {
+      data.add(TimeSeries(DateTime.fromMicrosecondsSinceEpoch(temperatureData[i][0]), temperatureData[i][1]));
+    }
+    List<charts.Series<TimeSeries, DateTime>> seriesList =  [charts.Series<TimeSeries, DateTime>(
+      id: 'Temperature',
+      colorFn: (_, __) => charts.MaterialPalette.blue.shadeDefault,
+      domainFn: (TimeSeries wear, _) => wear.time,
+      measureFn: (TimeSeries wear, _) => wear.value,
+      // data is a List<LiveWerkzeuge> - extract the information from data
+      // could use i as index - there isn't enough information in the question
+      // map from 'data' to the series
+      // this is a guess
+      data: data,
+    )];
+    return new charts.TimeSeriesChart(
+      seriesList,
+      animate: false,
+      // Optionally pass in a [DateTimeFactory] used by the chart. The factory
+      // should create the same type of [DateTime] as the data provided. If none
+      // specified, the default creates local date time.
+      dateTimeFactory: const charts.LocalDateTimeFactory(),
+        primaryMeasureAxis: new charts.NumericAxisSpec(
+            tickProviderSpec:
+            new charts.BasicNumericTickProviderSpec(zeroBound: false)),
+
+    );
+  }
+
+  Widget createHumidityChart() {
+    List<TimeSeries> data = [];
+    for (int i = 0; i < humidityData.length; i++) {
+      data.add(TimeSeries(DateTime.fromMicrosecondsSinceEpoch(humidityData[i][0]), humidityData[i][1]));
+    }
+    List<charts.Series<TimeSeries, DateTime>> seriesList =  [charts.Series<TimeSeries, DateTime>(
+      id: 'Humidity',
+      colorFn: (_, __) => charts.MaterialPalette.blue.shadeDefault,
+      domainFn: (TimeSeries wear, _) => wear.time,
+      measureFn: (TimeSeries wear, _) => wear.value,
+      // data is a List<LiveWerkzeuge> - extract the information from data
+      // could use i as index - there isn't enough information in the question
+      // map from 'data' to the series
+      // this is a guess
+      data: data,
+    )];
+    return new charts.TimeSeriesChart(
+      seriesList,
+      animate: false,
+      // Optionally pass in a [DateTimeFactory] used by the chart. The factory
+      // should create the same type of [DateTime] as the data provided. If none
+      // specified, the default creates local date time.
+      dateTimeFactory: const charts.LocalDateTimeFactory(),
+      primaryMeasureAxis: new charts.NumericAxisSpec(
+          tickProviderSpec:
+          new charts.BasicNumericTickProviderSpec(zeroBound: false)),
+
+    );
+  }
+
+}
+
+class TimeSeries {
+  final DateTime time;
+  final double value;
+
+  TimeSeries(this.time, this.value);
 }
