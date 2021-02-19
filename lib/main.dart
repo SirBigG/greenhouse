@@ -34,10 +34,11 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   List temperatureData = [];
   List humidityData = [];
+  String filter = '1h';
 
-  getTemperature() async {
+  getTemperature({period = '1h'}) async {
     var response = await http.get(
-      'http://greenhouse-api.agromega.in.ua/temperature',
+      'http://greenhouse-api.agromega.in.ua/temperature?period=$period',
       headers: {'Accept': 'application/json'},
     );
     setState(() {
@@ -46,9 +47,9 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  getHumidity() async {
+  getHumidity({period = '1h'}) async {
     var response = await http.get(
-      'http://greenhouse-api.agromega.in.ua/humidity',
+      'http://greenhouse-api.agromega.in.ua/humidity?period=$period',
       headers: {'Accept': 'application/json'},
     );
     setState(() {
@@ -72,26 +73,45 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
         body: Center(
             child: Container(
-              margin: EdgeInsets.all(30.0),
+                margin: EdgeInsets.all(30.0),
                 child: ListView(
-          scrollDirection: Axis.vertical,
-          children: [
-            Text("Temperature (C)"),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Container(
-                margin: EdgeInsets.only(top: 10.0, bottom: 10.0),
-                  height: 300.0, width: 900.0, child: createTemperatureChart()),
-            ),
-            Text("Humidity (%)"),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Container(
-                  margin: EdgeInsets.only(top: 10.0, bottom: 10.0),
-                  height: 300.0, width: 900.0, child: createHumidityChart()),
-            )
-          ],
-        ))));
+                  scrollDirection: Axis.vertical,
+                  children: [
+                    Container(
+                        height: 30.0,
+                        width: 900.0,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: <Widget>[
+                            Wrap(spacing: 10.0, runSpacing: 0.0, children: [
+                              filterChip('1h'),
+                              filterChip('6h'),
+                              filterChip('12h'),
+                              filterChip('1d'),
+                              filterChip('7d'),
+                            ])
+                          ],
+                        )),
+                    Text("Temperature (C)"),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Container(
+                          margin: EdgeInsets.only(top: 10.0, bottom: 10.0),
+                          height: 300.0,
+                          width: 900.0,
+                          child: createTemperatureChart()),
+                    ),
+                    Text("Humidity (%)"),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Container(
+                          margin: EdgeInsets.only(top: 10.0, bottom: 10.0),
+                          height: 300.0,
+                          width: 900.0,
+                          child: createHumidityChart()),
+                    )
+                  ],
+                ))));
   }
 
   Widget createTemperatureChart() {
@@ -121,6 +141,21 @@ class _MyHomePageState extends State<MyHomePage> {
           tickProviderSpec:
               new charts.BasicNumericTickProviderSpec(zeroBound: false)),
     );
+  }
+
+  Widget filterChip(String period) {
+    return ChoiceChip(
+        selected: period == filter,
+        label: Text(period),
+        onSelected: (bool selected) {
+          if (period != filter) {
+            setState(() {
+              filter = period;
+            });
+            this.getTemperature(period: period).then((d) => {});
+            this.getHumidity(period: period).then((d) => {});
+          }
+        });
   }
 
   Widget createHumidityChart() {
