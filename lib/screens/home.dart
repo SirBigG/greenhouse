@@ -16,6 +16,7 @@ class HomePage extends StatefulWidget {
 class _MyHomePageState extends State<HomePage> {
   List temperatureData = [];
   List humidityData = [];
+  List moistureData = [];
   String filter = '1h';
 
   getTemperature({period: '1h'}) {
@@ -34,11 +35,20 @@ class _MyHomePageState extends State<HomePage> {
         });
   }
 
+  getMoisture({period: '1h'}) {
+    api.getMoisture(period: period).then((data) => {
+      setState(() {
+        moistureData = data;
+      })
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     this.getTemperature();
     this.getHumidity();
+    this.getMoisture();
   }
 
   @override
@@ -86,6 +96,15 @@ class _MyHomePageState extends State<HomePage> {
                           height: 300.0,
                           width: 900.0,
                           child: createHumidityChart()),
+                    ),
+                    Text("Moisture"),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Container(
+                          margin: EdgeInsets.only(top: 10.0, bottom: 10.0),
+                          height: 300.0,
+                          width: 900.0,
+                          child: createMoistureChart()),
                     )
                   ],
                 ))));
@@ -131,6 +150,7 @@ class _MyHomePageState extends State<HomePage> {
             });
             this.getTemperature(period: period);
             this.getHumidity(period: period);
+            this.getMoisture(period: period);
           }
         });
   }
@@ -161,6 +181,33 @@ class _MyHomePageState extends State<HomePage> {
       primaryMeasureAxis: new charts.NumericAxisSpec(
           tickProviderSpec:
               new charts.BasicNumericTickProviderSpec(zeroBound: false)),
+    );
+  }
+
+  Widget createMoistureChart() {
+    List<models.TimeSeries> data = [];
+    for (int i = 0; i < moistureData.length; i++) {
+        data.add(models.TimeSeries(
+            DateTime.fromMicrosecondsSinceEpoch(
+                (moistureData[i][0] / 1000).toInt()),
+            moistureData[i][1]));
+    }
+    List<charts.Series<models.TimeSeries, DateTime>> seriesList = [
+      charts.Series<models.TimeSeries, DateTime>(
+        id: 'Humidity',
+        colorFn: (_, __) => charts.MaterialPalette.blue.shadeDefault,
+        domainFn: (models.TimeSeries wear, _) => wear.time,
+        measureFn: (models.TimeSeries wear, _) => wear.value,
+        data: data,
+      )
+    ];
+    return new charts.TimeSeriesChart(
+      seriesList,
+      animate: true,
+      dateTimeFactory: const charts.LocalDateTimeFactory(),
+      primaryMeasureAxis: new charts.NumericAxisSpec(
+          tickProviderSpec:
+          new charts.BasicNumericTickProviderSpec(zeroBound: false)),
     );
   }
 }

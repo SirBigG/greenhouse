@@ -21,3 +21,13 @@ getHumidity({period = '1h'}) async {
 
   return json.decode(response.body)["results"][0]["series"][0]["values"];
 }
+
+
+getMoisture({period = '1h'}) async {
+  var response = await http.get(
+    '$API_HOST/moisture?period=$period',
+    headers: {'Accept': 'application/json'},
+  );
+
+  return json.decode(response.body)["results"][0]["series"][0]["values"];
+}
